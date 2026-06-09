@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>利維坦戰情室</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0e1a; color: #00ffaa; font-family: 'Courier New', monospace; padding: 20px; }
+        h1 { text-align: center; font-size: 2rem; margin-bottom: 20px; text-shadow: 0 0 10px #00ffaa; }
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; }
+        .panel { background: #0f1320; border: 1px solid #00ffaa; border-radius: 10px; padding: 20px; box-shadow: 0 0 15px rgba(0,255,170,0.1); }
+        .panel h2 { font-size: 1.2rem; margin-bottom: 15px; border-bottom: 1px solid #00ffaa; display: inline-block; }
+        .stat-value { font-size: 1.5rem; font-weight: bold; margin: 10px 0; }
+        .stat-label { color: #88ffcc; margin-top: 10px; }
+        .chat-container { grid-column: span 2; height: 450px; display: flex; flex-direction: column; }
+        .chat-header { background: #0a0e1a; border-bottom: 1px solid #00ffaa; padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .chat-messages { flex: 1; overflow-y: auto; background: #0a0e1a; border: 1px solid #00ffaa; border-radius: 10px; padding: 15px; margin-bottom: 10px; }
+        .message { margin-bottom: 15px; }
+        .message.user { color: #ffaa00; text-align: right; }
+        .message.bot { color: #00ffaa; text-align: left; }
+        .message .sender { font-weight: bold; margin-bottom: 5px; }
+        .input-area { display: flex; gap: 10px; margin-top: 10px; }
+        .input-area input { flex: 1; background: #0f1320; border: 1px solid #00ffaa; color: #00ffaa; padding: 12px; border-radius: 5px; font-family: monospace; }
+        .input-area button { background: #00ffaa; color: #0a0e1a; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .input-area button:hover { background: #00dd88; }
+        canvas { max-height: 120px; }
+        .vision-area { margin-top: 15px; }
+        .vision-area input { background: #0f1320; border: 1px solid #00ffaa; color: #00ffaa; padding: 8px; border-radius: 5px; }
+        .vision-result { margin-top: 10px; padding: 10px; background: #0a0e1a; border-radius: 5px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <h1>⚙️ 利維坦戰情室 | Leviathan War Room</h1>
+    <div class="dashboard">
+        <div class="panel">
+            <h2>📊 系統監控</h2>
+            <div class="stat-label">CPU 使用率</div>
+            <div class="stat-value" id="cpuVal">0%</div>
+            <canvas id="cpuChart" width="200" height="80"></canvas>
+            <div class="stat-label">記憶體使用率</div>
+            <div class="stat-value" id="memVal">0%</div>
+            <div class="stat-label">📀 磁碟讀寫</div>
+            <div class="stat-value" id="ioVal" style="font-size:1rem">0 B/s</div>
+        </div>
+        <div class="panel">
+            <h2>🛡️ 安全狀態</h2>
+            <div class="stat-label">心理學顧問</div>
+            <div class="stat-value" id="psyStatus">⏳ 待命</div>
+            <div class="stat-label">防禦模式</div>
+            <div class="stat-value" id="defenseMode">NORMAL</div>
+            <div class="stat-label">視覺哨兵</div>
+            <div class="stat-value" id="visionStatus">⏳ 待命</div>
+        </div>
+        <div class="panel chat-container">
+            <div class="chat-header">
+                <span class="title">👑 統丞 (天啟商) | 指揮中樞</span>
+                <span class="status">執行層：心理學參謀 | 視覺哨兵</span>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot">
+                    <div class="sender">⚙️ 利維坦</div>
+                    <div>戰情室 v2.0 已啟動。支援文字對話、心理分析、圖像識別。</div>
+                </div>
+            </div>
+            <div class="vision-area">
+                <input type="file" id="imageInput" accept="image/*">
+                <button onclick="analyzeImage()">🔍 視覺分析</button>
+                <div id="visionResult" class="vision-result"></div>
+            </div>
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="輸入王令 (如：心理分析、系統狀態)..." onkeypress="if(event.keyCode==13) sendCommand()">
+                <button onclick="sendCommand()">發送王令</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cpuData = [];
+        let cpuChart = null;
+        
+        function initChart() {
+            const ctx = document.getElementById('cpuChart').getContext('2d');
+            cpuChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: Array(20).fill(''), datasets: [{ label: 'CPU %', data: [], borderColor: '#00ffaa', backgroundColor: 'rgba(0,255,170,0.1)', fill: true }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#00ffaa' } } } }
+            });
+        }
+        
+        function updateStats() {
+            fetch('/api/system_stats')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('cpuVal').innerText = d.cpu + '%';
+                    document.getElementById('memVal').innerText = d.memory + '%';
+                    document.getElementById('ioVal').innerHTML = d.disk_io || '0 B/s';
+                    cpuData.push(d.cpu);
+                    if(cpuData.length > 20) cpuData.shift();
+                    if(cpuChart) {
+                        cpuChart.data.datasets[0].data = [...cpuData];
+                        cpuChart.update();
+                    }
+                });
+            
+            fetch('/api/defense/status')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('defenseMode').innerText = d.defense_mode || 'NORMAL';
+                });
+        }
+        
+        function sendCommand() {
+            const input = document.getElementById('userInput');
+            const msg = input.value.trim();
+            if(!msg) return;
+            const chatDiv = document.getElementById('chatMessages');
+            chatDiv.innerHTML += `<div class="message user"><div class="sender">👑 統丞</div><div>${msg}</div></div>`;
+            input.value = '';
+            chatDiv.innerHTML += `<div class="message bot"><div class="sender">⚙️ 利維坦</div><div>思考中...</div></div>`;
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+            
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            })
+            .then(r => r.json())
+            .then(d => {
+                const messages = chatDiv.getElementsByClassName('message');
+                if(messages.length && messages[messages.length-1].innerText.includes('思考中')) {
+                    messages[messages.length-1].remove();
+                }
+                chatDiv.innerHTML += `<div class="message bot"><div class="sender">⚙️ ${d.sender || '利維坦'}</div><div>${d.reply}</div></div>`;
+                chatDiv.scrollTop = chatDiv.scrollHeight;
+            });
+        }
+        
+        function analyzeImage() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            if(!file) {
+                alert('請選擇圖片');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            document.getElementById('visionResult').innerHTML = '🔄 分析中...';
+            
+            fetch('/api/upload_vision', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(d => {
+                if(d.status === 'success') {
+                    document.getElementById('visionResult').innerHTML = `🔍 分析結果：<br>${d.analysis}`;
+                } else {
+                    document.getElementById('visionResult').innerHTML = `❌ 分析失敗：${d.error || d.message}`;
+                }
+            })
+            .catch(e => {
+                document.getElementById('visionResult').innerHTML = `❌ 錯誤：${e}`;
+            });
+        }
+        
+        initChart();
+        setInterval(updateStats, 2000);
+        updateStats();
+    </script>
+</body>
+</html>
