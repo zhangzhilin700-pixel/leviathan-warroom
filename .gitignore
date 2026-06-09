@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.bak
+
+# 機密檔案
+commands.py
+.env
+*.log
+
+# 系統檔案
+.DS_Store
+Thumbs.db
