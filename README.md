@@ -1,4 +1,16 @@
-# 🐋 利維坦戰情室 | Leviathan War Room
+## 🚀 快速啟動
+
+### 方法一：虛擬環境（推薦）
+```bash
+# 建立虛擬環境
+python3 -m venv venv
+source venv/bin/activate
+
+# 安裝依賴
+pip install flask psutil requests
+
+# 啟動戰情室
+python3 app.py# 🐋 利維坦戰情室 | Leviathan War Room
 
 一個**完全離線、具備心理學感知與視覺分析能力**的 AI 控制中樞。
 
